@@ -28,12 +28,14 @@ def convert(img_file, label_file, output_file, n):
     l.close()
     o.close()
 
-def make_file(is_make):
+def make_file(data_path,
+              fin_train_name,
+              fin_test_name,
+              is_make):
     if(not is_make):
         return
 
     # converting data sets to csv
-    data_path = "/home/samir/Documents/data/mnist/"
     files = os.listdir(data_path)
 
     file_list = [None] * 4
@@ -73,24 +75,27 @@ def make_file(is_make):
     data_orig_test.rename(columns={'7':'label'}, inplace=True)
 
     # Writing final version of files
-    fin_train_name = "mnist_train_final.csv"
-    fin_test_name = "mnist_test_final.csv"
-
     data_orig_train.to_csv(data_path+fin_train_name, index=False)
     data_orig_test.to_csv(data_path+fin_test_name, index=False)
 
 
 if __name__ == "__main__":
 
-    make_file(False)
+    data_path = "/home/samir/Documents/data/mnist/"
+    fin_train_name = "mnist_train_final.csv"
+    fin_test_name = "mnist_test_final.csv"
 
-    # # Reading final files now
-    # data_fin_train = pd.read_csv(data_path+fin_train_name)
-    # data_fin_test = pd.read_csv(data_path+fin_test_name)
+    make_file(data_path,
+              fin_train_name,
+              fin_test_name,
+              False)
 
+    # Reading final files now
+    data_fin_train = pd.read_csv(data_path+fin_train_name)
+    data_fin_test = pd.read_csv(data_path+fin_test_name)
 
-    # # train??
-    # ind = 3
-    # label_train = data_fin_train['label']
-    # print(label_train[ind])
+    # train??
+    ind = 3
+    label_train = data_fin_train['label']
+    print(label_train[ind])
 
