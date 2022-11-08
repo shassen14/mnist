@@ -5,6 +5,7 @@ import os
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
+from mnist import MNIST
 
 ############################################################
 
@@ -84,92 +85,76 @@ def make_file(data_path,
 
 ############################################################
 
-def init_params(size):
-    W1 = np.random.rand(10, size) - 0.5
-    b1 = np.random.rand(10, 1) - 0.5
-    W2 = np.random.rand(10, 10) - 0.5
-    b2 = np.random.rand(10, 1) - 0.5
-    return W1, b1, W2, b2
-
-############################################################
-
 def ReLU(Z):
-    return np.maximum(0, Z)
+    return np.maximum(Z,0)
 
-############################################################
-
-def ReLU_deriv(Z):
+def derivative_ReLU(Z):
     return Z > 0
 
-############################################################
-
-def soft_max(Z):
-    exp = np.exp(Z - np.max(Z))
+def softmax(Z):
+    """Compute softmax values for each sets of scores in x."""
+    exp = np.exp(Z - np.max(Z)) #le np.max(Z) evite un overflow en diminuant le contenu de exp
     return exp / exp.sum(axis=0)
 
-############################################################
+def init_params(size):
+    W1 = np.random.rand(10,size) - 0.5
+    b1 = np.random.rand(10,1) - 0.5
+    W2 = np.random.rand(10,10) - 0.5
+    b2 = np.random.rand(10,1) - 0.5
+    return W1,b1,W2,b2
 
-def forward_prop(W1, b1, W2, b2, X):
-    Z1 = W1.dot(X) + b1
-    A1 = ReLU(Z1)
-    Z2 = W2.dot(A1) + b2
-    A2 = soft_max(Z2)
+def forward_propagation(X,W1,b1,W2,b2):
+    Z1 = W1.dot(X) + b1 #10, m
+    A1 = ReLU(Z1) # 10,m
+    Z2 = W2.dot(A1) + b2 #10,m
+    A2 = softmax(Z2) #10,m
     return Z1, A1, Z2, A2
 
-############################################################
-
 def one_hot(Y):
-    ''' return a 0 vector with 1 only in the position correspondind to the value in Y'''
-    one_hot_y = np.zeros((Y.max()+1 ,Y .size)) 
-    one_hot_y[Y, np.arange(Y.size)] = 1 
-    return one_hot_y
+    ''' return an 0 vector with 1 only in the position correspondind to the value in Y'''
+    one_hot_Y = np.zeros((Y.max()+1,Y.size)) #si le chiffre le plus grand dans Y est 9 ca fait 10 lignes
+    one_hot_Y[Y,np.arange(Y.size)] = 1 # met un 1 en ligne Y[i] et en colonne i, change l'ordre mais pas le nombre
+    return one_hot_Y
 
-############################################################
+def backward_propagation(X, Y, A1, A2, W2, Z1, m):
+    one_hot_Y = one_hot(Y)
+    dZ2 = 2*(A2 - one_hot_Y) #10,m
+    dW2 = 1/m * (dZ2.dot(A1.T)) # 10 , 10
+    db2 = 1/m * np.sum(dZ2,1) # 10, 1
+    dZ1 = W2.T.dot(dZ2)*derivative_ReLU(Z1) # 10, m
+    dW1 = 1/m * (dZ1.dot(X.T)) #10, 784
+    db1 = 1/m * np.sum(dZ1,1) # 10, 1
 
-def back_prop(Z1, A1, Z2, A2, W1, W2, X, Y, m):
-    one_hot_y = one_hot(Y)
-    dZ2 = A2 - one_hot_y
-    dW2 = 1 / m * dZ2.dot(A1.T)
-    db2 = 1 / m * np.sum(dZ2)
-    dZ1 = W2.T.dot(dZ2) * ReLU_deriv(Z1)
-    dW1 = 1 / m * dZ1.dot(X.T)
-    db1 = 1 / m * np.sum(dZ1)
     return dW1, db1, dW2, db2
 
-############################################################
+def update_params(alpha, W1, b1, W2, b2, dW1, db1, dW2, db2):
+    W1 -= alpha * dW1
+    b1 -= alpha * np.reshape(db1, (10,1))
+    W2 -= alpha * dW2
+    b2 -= alpha * np.reshape(db2, (10,1))
 
-def update_params(W1, b1, W2, b2, dW1, db1, dW2, db2, alpha):
-    W1 = W1 - alpha * dW1
-    b1 = b1 - alpha * db1    
-    W2 = W2 - alpha * dW2  
-    b2 = b2 - alpha * db2    
     return W1, b1, W2, b2
-
-############################################################
 
 def get_predictions(A2):
     return np.argmax(A2, 0)
 
-############################################################
-
 def get_accuracy(predictions, Y):
-    print(predictions, Y)
-    return np.sum(predictions == Y) / Y.size
-
-############################################################
+    return np.sum(predictions == Y)/Y.size
 
 def gradient_descent(X, Y, alpha, iterations):
-    size, m = X.shape
+    size , m = X.shape
 
     W1, b1, W2, b2 = init_params(size)
     for i in range(iterations):
-        Z1, A1, Z2, A2 = forward_prop(W1, b1, W2, b2, X)
-        dW1, db1, dW2, db2 = back_prop(Z1, A1, Z2, A2, W1, W2, X, Y, m)
-        W1, b1, W2, b2 = update_params(W1, b1, W2, b2, dW1, db1, dW2, db2, alpha)
-        if i % 10 == 0:
-            print("Iteration: ", i)
-            predictions = get_predictions(A2)
-            print(f"{get_accuracy(predictions, Y):.3%}")
+        Z1, A1, Z2, A2 = forward_propagation(X, W1, b1, W2, b2)
+        dW1, db1, dW2, db2 = backward_propagation(X, Y, A1, A2, W2, Z1, m)
+
+        W1, b1, W2, b2 = update_params(alpha, W1, b1, W2, b2, dW1, db1, dW2, db2)   
+
+        if (i+1) % int(iterations/10) == 0:
+            print(f"Iteration: {i+1} / {iterations}")
+            prediction = get_predictions(A2)
+            print(f'{get_accuracy(prediction, Y):.3%}')
     return W1, b1, W2, b2
 
 ############################################################
@@ -177,8 +162,8 @@ def gradient_descent(X, Y, alpha, iterations):
 if __name__ == "__main__":
 
     data_path = "/home/samir/Documents/data/mnist/"
-    fin_train_name = "mnist_train_final.csv"
-    fin_test_name = "mnist_test_final.csv"
+    fin_train_name = "mnist_train.csv"
+    fin_test_name = "mnist_test.csv"
 
     make_file(data_path,
               fin_train_name,
@@ -195,13 +180,18 @@ if __name__ == "__main__":
     np.random.shuffle(data_train)
     data_train = data_train[0:m_train].T
 
-    x_train = data_train[1:n_train]
+    x_train = data_train[1:n_train]/ 255
     y_train = data_train[0]
 
-    print(x_train.shape)
-    print(y_train.shape)
+    mndata = MNIST(data_path)
+    images, labels = mndata.load_training()
+    x = np.array(images).T / 255
+    y = np.array(labels)
 
-    W1, b1, W2, b2 = gradient_descent(x_train, y_train, 0.10, 500)
+    # print(x_train.sum())
+    # print(y_train)
+
+    W1, b1, W2, b2 = gradient_descent(x, y, 0.10, 500)
 
 
 
